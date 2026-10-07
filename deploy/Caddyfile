@@ -1,0 +1,7 @@
+# Put a TLS reverse proxy in front of the platform when exposing it outside localhost.
+# PUBLIC_URL must match this origin. SSE and WebSocket upgrades are passed through.
+dashboard.example.com {
+  reverse_proxy 127.0.0.1:3000 {
+    flush_interval -1
+  }
+}

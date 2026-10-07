@@ -1,0 +1,10 @@
+FROM node:22-bookworm-slim
+WORKDIR /opt/template
+COPY dashboard-base/package*.json ./
+RUN npm ci --ignore-scripts && npm cache clean --force
+COPY dashboard-base/public/custom /opt/custom
+WORKDIR /workspace
+ENV NODE_ENV=development NEXT_TELEMETRY_DISABLED=1 HOME=/tmp NODE_OPTIONS=--max-old-space-size=768 WATCHPACK_POLLING=1000
+USER node
+EXPOSE 3000
+CMD ["/bin/sh", "-c", "test -e node_modules || ln -s /opt/template/node_modules node_modules; exec node /opt/template/node_modules/next/dist/bin/next dev --webpack --hostname 0.0.0.0 --port 3000"]

@@ -1,0 +1,13 @@
+[Unit]
+Description=Block dashboard sessions from EC2 metadata and host services
+After=docker.service
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/von-neumann-session-firewall
+RemainAfterExit=yes
+
+[Install]
+WantedBy=docker.service

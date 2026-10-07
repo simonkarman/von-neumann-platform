@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Von Neumann · Your living workspace</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <a class="brand" href="/"
+        ><span class="brand-mark">v<span>n</span></span
+        ><span>von neumann<small>YOUR DATA, IN CONVERSATION</small></span></a
+      >
+      <div class="workspace-label">
+        <span class="workspace-avatar">W</span>My workspace<span
+          style="margin-left: auto"
+          >⌄</span
+        >
+      </div>
+      <div class="nav-section">
+        <span class="eyebrow">WORKSPACE</span
+        ><a class="selected" href="/"><span>▦</span>All dashboards</a
+        ><button id="nav-new"><span>＋</span>New dashboard</button>
+      </div>
+      <div class="nav-section connections">
+        <span class="eyebrow">CONNECTED SOURCES <span>1</span></span>
+        <div class="connector">
+          <span class="aws-icon">☁</span>
+          <div>
+            Amazon Web Services<small id="connector-mode"
+              >Read-only connector</small
+            >
+          </div>
+          <span class="dot"></span>
+        </div>
+      </div>
+      <div class="sidebar-bottom">
+        <div class="mode-note">
+          <span>◇</span>
+          <div id="mode-note">
+            A workspace that evolves<small
+              >Built around the questions you ask</small
+            >
+          </div>
+        </div>
+        <div class="user-card">
+          <span class="avatar">VN</span>
+          <div>My workspace<small>Workspace editor</small></div>
+          <button id="logout" class="icon-button" title="Sign out">↪</button>
+        </div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <span class="breadcrumbs"
+          >Workspace <span>/</span> <strong>All dashboards</strong></span
+        ><span class="topbar-note"
+          ><span class="dot"></span>Every question is a beginning</span
+        >
+      </header>
+      <div class="landing-content">
+        <div class="page-heading">
+          <div>
+            <span class="eyebrow">MAKE ROOM FOR YOUR QUESTIONS</span>
+            <h1>Your living workspace<span class="title-dot"></span></h1>
+            <p>Dashboards that grow with your curiosity.</p>
+          </div>
+          <button class="primary" id="create">
+            ＋ <span>New dashboard</span>
+          </button>
+        </div>
+        <section class="welcome">
+          <div class="welcome-copy">
+            <span class="eyebrow">FROM A QUESTION TO A CLEARER PICTURE</span>
+            <h2>Your data has a story.<br />Let’s bring it into view.</h2>
+            <p>
+              Connect your sources. Ask what matters.<br />Watch your dashboard
+              take shape, one request at a time.
+            </p>
+            <button id="welcome-new" class="text-button">
+              Create your first dashboard <span>↗</span>
+            </button>
+          </div>
+          <div class="illustration" aria-hidden="true">
+            <div class="mock-card">
+              <div class="mock-title">
+                <span class="mock-dot"></span>CPU utilization<span>↗</span>
+              </div>
+              <div class="mock-value">
+                34.8<span>%</span><small>↘ 12.4%</small>
+              </div>
+              <svg viewBox="0 0 270 75">
+                <defs>
+                  <linearGradient id="chart-fill" x1="0" x2="0" y1="0" y2="1">
+                    <stop stop-color="#70a888" stop-opacity=".3" />
+                    <stop offset="1" stop-color="#70a888" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M0 58L13 55L24 61L35 49L49 48L61 29L72 36L85 30L97 41L110 23L120 33L132 39L146 19L159 24L168 35L181 21L194 30L207 19L220 27L235 17L251 20L270 9V75H0Z"
+                  fill="url(#chart-fill)"
+                />
+                <path
+                  d="M0 58L13 55L24 61L35 49L49 48L61 29L72 36L85 30L97 41L110 23L120 33L132 39L146 19L159 24L168 35L181 21L194 30L207 19L220 27L235 17L251 20L270 9"
+                  stroke="#719c79"
+                  stroke-width="2"
+                  fill="none"
+                />
+              </svg>
+              <div class="mock-axis">
+                <span>00:00</span><span>12:00</span><span>24:00</span>
+              </div>
+            </div>
+            <div class="mock-prompt">
+              <span>✧</span>Add a graph of CPU usage<span>↑</span>
+            </div>
+            <span class="float-spark">✧</span><span class="float-circle"></span
+            ><span class="illustration-caption"
+              >ILLUSTRATIVE PREVIEW · NOT LIVE DATA</span
+            >
+          </div>
+        </section>
+        <div class="section-heading">
+          <h2>Your dashboards <span id="count">0</span></h2>
+          <button class="subtle" id="import-button">
+            ↓ Import session branch
+          </button>
+        </div>
+        <div id="notice" role="status" hidden></div>
+        <section id="sessions" class="session-grid"></section>
+        <div class="workspace-footer">
+          <span>◇ Private by default. Share on your terms.</span
+          ><span id="provider-label"
+            >Vertex AI · Application Default Credentials</span
+          >
+        </div>
+      </div>
+    </main>
+    <dialog id="login-dialog">
+      <form id="login-form">
+        <span class="eyebrow">WELCOME TO VON NEUMANN</span>
+        <h2>Your workspace awaits.</h2>
+        <p>Enter your workspace password to continue.</p>
+        <label
+          >Workspace password<input
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            required
+        /></label>
+        <p id="login-error" role="alert"></p>
+        <button class="primary" type="submit">Open workspace →</button>
+      </form>
+    </dialog>
+    <dialog id="import-dialog">
+      <form id="import-form">
+        <span class="eyebrow">CONTINUE WHERE YOU LEFT OFF</span>
+        <h2>Import a dashboard</h2>
+        <p>
+          Restore a session branch from the configured dashboard Git repository.
+          Chat history stays on the original deployment.
+        </p>
+        <label
+          >Session ID<input
+            name="id"
+            placeholder="24-character session ID"
+            pattern="[a-f0-9]{24}"
+            required
+        /></label>
+        <div class="dialog-actions">
+          <button type="button" class="secondary" id="close-import">
+            Cancel</button
+          ><button class="primary" type="submit">Import dashboard</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

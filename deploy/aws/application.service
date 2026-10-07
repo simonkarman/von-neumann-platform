@@ -1,0 +1,16 @@
+[Unit]
+Description=Von Neumann Dashboard
+After=network-online.target docker.service von-neumann-session-firewall.service
+Requires=docker.service von-neumann-session-firewall.service
+RequiresMountsFor=/srv/von-neumann
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/von-neumann
+ExecStart=/usr/bin/docker compose --env-file /etc/von-neumann/runtime.env -f deploy/aws/compose.yaml up -d platform proxy
+ExecStop=/usr/bin/docker compose --env-file /etc/von-neumann/runtime.env -f deploy/aws/compose.yaml stop platform proxy
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Opening your dashboard · Von Neumann</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="gate">
+      <span class="brand-mark">v<span>n</span></span>
+      <h1 id="title">Making space for your ideas.</h1>
+      <p id="status">
+        Your dashboard is starting. The first launch can take a little longer.
+      </p>
+      <div class="loader" id="loader"></div>
+      <form id="login" hidden>
+        <input
+          name="password"
+          type="password"
+          placeholder="Workspace password"
+          autocomplete="current-password"
+          aria-label="Workspace password"
+          required
+        /><button class="primary">Open dashboard →</button>
+      </form>
+      <button id="retry" class="secondary" hidden>Restart dashboard</button
+      ><button id="import" class="secondary" hidden>Restore from Git</button
+      ><a href="/">← Back to workspace</a>
+    </main>
+    <script src="/gate.js"></script>
+  </body>
+</html>

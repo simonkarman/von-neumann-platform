@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+process.env.DATA_DIR = await mkdtemp(path.join(tmpdir(), 'vn-drafts-'));
+process.env.RUNTIME_DRIVER = 'process';
+process.env.NODE_ENV = 'test';
+process.env.AWS_MODE = 'demo';
+const {store} = await import('../server/store.js');
+const {saveDraft,readDraft,testDraft} = await import('../server/widget-drafts.js');
+const good = {id:'custom',type:'custom',title:'Custom',custom:{source:'function render(){return {view:{text:"safe"}}}',bindings:[]}};
+test('drafts and failed tests cannot modify the published dashboard; stale drafts are rejected', async () => {
+  const s = store.create(); const before = structuredClone(s.dashboard);
+  saveDraft(s.id,good);
+  assert.equal((await testDraft(s.id,'custom')).passed,true);
+  assert.deepEqual(store.get(s.id)!.dashboard,before);
+  saveDraft(s.id,{...good,custom:{...good.custom,source:'function render(){while(true){}}'}});
+  await assert.rejects(testDraft(s.id,'custom'));
+  assert.deepEqual(store.get(s.id)!.dashboard,before);
+  store.update(s.id,before,'new-revision','local');
+  assert.throws(()=>readDraft(s.id,'custom'),/changed since/);
+});
+test('deleted dashboards cannot be resurrected by late runtime status updates', () => {
+  const s=store.create(); store.status(s.id,'deleted'); store.status(s.id,'ready');
+  assert.equal(store.get(s.id),undefined);
+  assert.equal(store.get(s.id,true)!.status,'deleted');
+  assert.ok(!store.list().some(x=>x.id===s.id));
+  store.restoreDeleted(s.id); assert.equal(store.get(s.id)!.status,'stopped');
+});

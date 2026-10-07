@@ -1,0 +1,9 @@
+services:
+  platform:
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/google-adc.json
+    volumes:
+      - type: bind
+        source: ${ADC_FILE:?Set ADC_FILE to the absolute path of application_default_credentials.json}
+        target: /run/secrets/google-adc.json
+        read_only: true

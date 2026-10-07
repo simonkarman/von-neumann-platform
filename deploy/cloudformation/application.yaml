@@ -1,0 +1,347 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Von Neumann - single-host Docker deployment, encrypted persistent storage and IAM identities
+Parameters:
+  ProjectEnabled:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Security kill switch. False closes ingress and denies all application-role AWS access; use project:disable to also stop EC2.
+  Domain: { Type: String, AllowedPattern: "^[a-z0-9][a-z0-9.-]+[a-z0-9]$" }
+  ProjectName:
+    {
+      Type: String,
+      Default: von-neumann,
+      AllowedPattern: "^[a-z][a-z0-9-]{0,31}$",
+    }
+  BedrockInvokeResources:
+    Type: CommaDelimitedList
+    Description: Exact foundation model and inference profile ARNs resolved by deploy-aws.mjs
+  HostedZoneId: { Type: String }
+  ArtifactBucket: { Type: String }
+  ArtifactKey: { Type: String }
+  AdminPasswordArn: { Type: String }
+  SessionSecretArn: { Type: String }
+  ConnectorSecretArn: { Type: String }
+  AiSecretArn: { Type: String }
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64
+  InstanceType:
+    { Type: String, Default: t4g.large, AllowedValues: [t4g.large, t4g.xlarge] }
+  InventoryRegions:
+    Type: CommaDelimitedList
+Conditions:
+  ProjectIsEnabled: !Equals [!Ref ProjectEnabled, "true"]
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 172.30.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{ Key: Name, Value: !Ref ProjectName }]
+  Gateway: { Type: AWS::EC2::InternetGateway }
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: { VpcId: !Ref Vpc, InternetGatewayId: !Ref Gateway }
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 172.30.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: { VpcId: !Ref Vpc }
+  Route:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      {
+        RouteTableId: !Ref RouteTable,
+        DestinationCidrBlock: 0.0.0.0/0,
+        GatewayId: !Ref Gateway,
+      }
+  RouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref Subnet, RouteTableId: !Ref RouteTable }
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTPS application and ACME only; administration through SSM
+      VpcId: !Ref Vpc
+      SecurityGroupIngress: !If
+        - ProjectIsEnabled
+        - - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0 }
+          - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }
+        - []
+  Logs:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      { LogGroupName: !Sub "/${ProjectName}/platform", RetentionInDays: 14 }
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        [
+          !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore",
+        ]
+      Policies:
+        - !If
+          - ProjectIsEnabled
+          - !Ref AWS::NoValue
+          - PolicyName: project-disabled
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement: [{ Effect: Deny, Action: "*", Resource: "*" }]
+        - PolicyName: read-only-service-inventory
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: RegionalMetadata
+                Effect: Allow
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: !Ref InventoryRegions
+                Action:
+                  - cloudformation:ListStacks
+                  - cloudformation:ListStackResources
+                  - rds:DescribeDBInstances
+                  - rds:DescribeDBClusters
+                  - rds:DescribeDBSnapshots
+                  - rds:DescribeEvents
+                  - lambda:ListFunctions
+                  - lambda:ListEventSourceMappings
+                  - ec2:DescribeInstances
+                  - ec2:DescribeVolumes
+                  - ec2:DescribeAddresses
+                  - ec2:DescribeImages
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeRouteTables
+                  - ec2:DescribeNatGateways
+                  - ec2:DescribeInternetGateways
+                  - ec2:DescribeNetworkAcls
+                  - ec2:DescribeVpcEndpoints
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DescribeVpcPeeringConnections
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                  - cloudtrail:LookupEvents
+                  - cloudtrail:ListTrails
+                  - dynamodb:ListTables
+                  - dynamodb:DescribeTable
+                  - ecs:ListClusters
+                  - ecs:DescribeClusters
+                  - ecs:ListServices
+                  - ecs:DescribeServices
+                  - ecs:ListTasks
+                  - ecs:DescribeTasks
+                  - eks:ListClusters
+                  - eks:DescribeCluster
+                  - eks:ListNodegroups
+                  - elasticloadbalancing:DescribeLoadBalancers
+                  - elasticloadbalancing:DescribeTargetGroups
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:GetMetricData
+                  - sqs:ListQueues
+                  - sns:ListTopics
+                  - sns:ListSubscriptions
+                  - states:ListStateMachines
+                  - states:ListExecutions
+                  - ecr:DescribeRepositories
+                  - ecr:DescribeImages
+                  - elasticache:DescribeCacheClusters
+                  - secretsmanager:ListSecrets
+                  - kms:ListKeys
+                  - backup:ListBackupVaults
+                  - backup:ListBackupJobs
+              - Sid: GlobalMetadata
+                Effect: Allow
+                Resource: "*"
+                Action:
+                  [
+                    s3:ListAllMyBuckets,
+                    iam:ListRoles,
+                    iam:ListUsers,
+                    iam:ListPolicies,
+                    route53:ListHostedZones,
+                    route53:ListResourceRecordSets,
+                    cloudfront:ListDistributions,
+                  ]
+              - Sid: ApiGatewayCollectionsOnly
+                Effect: Allow
+                Action: apigateway:GET
+                Resource:
+                  [
+                    !Sub "arn:${AWS::Partition}:apigateway:*::/restapis",
+                    !Sub "arn:${AWS::Partition}:apigateway:*::/apis",
+                  ]
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: !Ref InventoryRegions
+              - Sid: ReadAccountLogEvents
+                Effect: Allow
+                Action: logs:FilterLogEvents
+                Resource: !Sub "arn:${AWS::Partition}:logs:*:${AWS::AccountId}:log-group:*"
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: !Ref InventoryRegions
+        - PolicyName: application
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  [
+                    !Ref AdminPasswordArn,
+                    !Ref SessionSecretArn,
+                    !Ref ConnectorSecretArn,
+                    !Ref AiSecretArn,
+                  ]
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${ArtifactBucket}/releases/*"
+              - Effect: Allow
+                Action:
+                  [
+                    logs:CreateLogStream,
+                    logs:PutLogEvents,
+                    logs:DescribeLogStreams,
+                    logs:FilterLogEvents,
+                  ]
+                Resource: !GetAtt Logs.Arn
+              - Effect: Allow
+                Action: [cloudwatch:GetMetricData, ec2:DescribeInstances]
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+                Resource: !Ref BedrockInvokeResources
+  Profile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: { Roles: [!Ref Role] }
+  DataVolume:
+    Type: AWS::EC2::Volume
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AvailabilityZone: !GetAtt Subnet.AvailabilityZone
+      Encrypted: true
+      Size: 80
+      VolumeType: gp3
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-data" }]
+  Host:
+    Type: AWS::EC2::Instance
+    DependsOn: [Route, RouteAssociation]
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref Profile
+      SubnetId: !Ref Subnet
+      SecurityGroupIds: [!Ref SecurityGroup]
+      MetadataOptions: { HttpTokens: required, HttpPutResponseHopLimit: 2 }
+      CreditSpecification: { CPUCredits: standard }
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            {
+              VolumeSize: 24,
+              VolumeType: gp3,
+              Encrypted: true,
+              DeleteOnTermination: true,
+            }
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-dashboard" }]
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          export AWS_REGION='${AWS::Region}'
+          export DOMAIN='${Domain}'
+          export DATA_VOLUME_ID='${DataVolume}'
+          export ADMIN_PASSWORD_SECRET_ARN='${AdminPasswordArn}'
+          export SESSION_SECRET_ARN='${SessionSecretArn}'
+          export AWS_CONNECTOR_SECRET_ARN='${ConnectorSecretArn}'
+          export AI_CONFIG_SECRET_ARN='${AiSecretArn}'
+          export CLOUDWATCH_LOG_GROUP='${Logs}'
+          mkdir -p /opt/von-neumann
+          aws s3 cp 's3://${ArtifactBucket}/${ArtifactKey}' /opt/von-neumann/release.tar.gz --region '${AWS::Region}'
+          tar -xzf /opt/von-neumann/release.tar.gz -C /opt/von-neumann
+          bash /opt/von-neumann/deploy/aws/bootstrap.sh
+  Attachment:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      { InstanceId: !Ref Host, VolumeId: !Ref DataVolume, Device: /dev/sdf }
+  Ip:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachment
+    Properties: { Domain: vpc }
+  IpAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties: { InstanceId: !Ref Host, AllocationId: !GetAtt Ip.AllocationId }
+  Dns:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref Domain
+      Type: A
+      TTL: "300"
+      ResourceRecords: [!Ref Ip]
+  BackupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: backup.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        [
+          !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup",
+        ]
+  BackupVault:
+    Type: AWS::Backup::BackupVault
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties: { BackupVaultName: !Ref ProjectName }
+  BackupPlan:
+    Type: AWS::Backup::BackupPlan
+    Properties:
+      BackupPlan:
+        BackupPlanName: !Sub "${ProjectName}-daily"
+        BackupPlanRule:
+          - RuleName: daily
+            TargetBackupVault: !Ref BackupVault
+            ScheduleExpression: cron(0 3 * * ? *)
+            Lifecycle: { DeleteAfterDays: 7 }
+  BackupSelection:
+    Type: AWS::Backup::BackupSelection
+    Properties:
+      BackupPlanId: !Ref BackupPlan
+      BackupSelection:
+        SelectionName: data-volume
+        IamRoleArn: !GetAtt BackupRole.Arn
+        Resources:
+          [
+            !Sub "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:volume/${DataVolume}",
+          ]
+Outputs:
+  Url: { Value: !Sub "https://${Domain}" }
+  InstanceId: { Value: !Ref Host }
+  PublicIp: { Value: !Ref Ip }
+  DataVolumeId: { Value: !Ref DataVolume }
+  InstanceRoleArn: { Value: !GetAtt Role.Arn }
+  LogGroup: { Value: !Ref Logs }

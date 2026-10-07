@@ -1,0 +1,69 @@
+services:
+  platform:
+    build:
+      context: ../..
+    image: von-neumann-platform:local
+    init: true
+    restart: unless-stopped
+    ports: ['127.0.0.1:3000:3000']
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      TRUST_PROXY_HOPS: 1
+      PUBLIC_URL: https://${DOMAIN}
+      DATA_DIR: /data
+      DASHBOARD_TEMPLATE_DIR: /app/dashboard-base
+      RUNTIME_DRIVER: docker
+      SESSION_DOCKER_NETWORK: von-neumann-sessions
+      SESSION_IMAGE: von-neumann-session:local
+      SESSION_VOLUME: von-neumann-data
+      MAX_ACTIVE_SESSIONS: 4
+      MAX_DAILY_PROMPTS: 100
+      AWS_REGION: ${AWS_REGION}
+      SECRETS_REGION: ${AWS_REGION}
+      ADMIN_PASSWORD_SECRET_ARN: ${ADMIN_PASSWORD_SECRET_ARN}
+      SESSION_SECRET_ARN: ${SESSION_SECRET_ARN}
+      AWS_CONNECTOR_SECRET_ARN: ${AWS_CONNECTOR_SECRET_ARN}
+      AI_CONFIG_SECRET_ARN: ${AI_CONFIG_SECRET_ARN}
+    group_add: ['${DOCKER_GID}']
+    volumes:
+      - data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [default, sessions]
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: ${CLOUDWATCH_LOG_GROUP}
+        awslogs-stream: platform
+  session-image:
+    profiles: [build]
+    build:
+      context: ../..
+      dockerfile: Dockerfile.session
+    image: von-neumann-session:local
+  proxy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports: ['80:80', '443:443']
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [default]
+    logging:
+      driver: local
+      options: {max-size: 10m, max-file: '3'}
+networks:
+  sessions:
+    name: von-neumann-sessions
+    internal: true
+    ipam:
+      config: [{subnet: 172.29.0.0/24}]
+volumes:
+  data: {name: von-neumann-data}
+  caddy-data: {}
+  caddy-config: {}

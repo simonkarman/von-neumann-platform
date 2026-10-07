@@ -1,0 +1,8 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "ReadEC2Metrics", "Effect": "Allow", "Action": ["cloudwatch:GetMetricData", "ec2:DescribeInstances"], "Resource": "*", "Condition": { "StringEquals": { "aws:RequestedRegion": "eu-west-1" } } },
+    { "Sid": "ReadSelectedLogs", "Effect": "Allow", "Action": ["logs:FilterLogEvents"], "Resource": ["arn:aws:logs:eu-west-1:YOUR_ACCOUNT_ID:log-group:YOUR_LOG_GROUP:*"] },
+    { "Sid": "ReadSelectedTables", "Effect": "Allow", "Action": ["dynamodb:Scan"], "Resource": ["arn:aws:dynamodb:eu-west-1:YOUR_ACCOUNT_ID:table/YOUR_TABLE"] }
+  ]
+}

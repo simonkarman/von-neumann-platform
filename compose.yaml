@@ -1,0 +1,41 @@
+services:
+  platform:
+    build: .
+    image: von-neumann-platform:local
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PORT:-3000}:3000"
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATA_DIR: /data
+      DASHBOARD_TEMPLATE_DIR: /app/dashboard-base
+      RUNTIME_DRIVER: docker
+      SESSION_DOCKER_NETWORK: von-neumann-sessions
+      SESSION_IMAGE: von-neumann-session:local
+      SESSION_VOLUME: von-neumann-data
+    group_add:
+      - "${DOCKER_GID:-0}"
+    volumes:
+      - data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - default
+      - sessions
+  # Build only: sessions are created on demand by the platform.
+  session-image:
+    profiles: [build]
+    build:
+      context: .
+      dockerfile: Dockerfile.session
+    image: von-neumann-session:local
+networks:
+  sessions:
+    name: von-neumann-sessions
+    internal: true
+volumes:
+  data:
+    name: von-neumann-data

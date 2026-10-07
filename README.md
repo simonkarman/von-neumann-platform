@@ -2,6 +2,18 @@
 
 A conversational AWS dashboard: ask questions, build charts/tables, or create interactive widgets. Each dashboard has its own Next.js development server and Git branch. This is an innovation-day prototype for a trusted workspace, **not a security-audited multi-tenant SaaS**.
 
+![Von Neumann with a CPU chart, log downloads, a sample table and an independently scrolling chat pane.](blog/images/cloud-operations.png)
+
+*Actual application screenshots using synthetic data and the deterministic demo assistant; no real account data or private conversations are shown.*
+
+The standard widget toolkit covers charts, tables and log controls. For more unusual interactions, an isolated custom-widget runtime supports bounded views such as this keyboard-controlled 3D capacity explorer:
+
+![The custom 3D capacity explorer running with synthetic volumes in an isolated interpreter.](blog/images/interactive-capacity.png)
+
+Read the architecture story: [Building a dashboard that can change itself](blog/building-a-dashboard-that-can-change-itself.md).
+
+The sidebar links to recent dashboards, keeps source explanations at the bottom, and provides an explicit logout action. “Add source” explains the current single-connector limitation; it does not collect credentials or provision a connector.
+
 ## Two repositories
 
 | Repository | Contents |
@@ -192,6 +204,8 @@ npm run test:e2e
 ```
 
 Live smoke scripts create/edit sessions, query real data and spend model tokens. Do not run them for documentation/publication. Optional test settings include `CHECK_SESSION_ID`, `CHECK_INSTANCE_ID`, `CHECK_MODEL`, `CHECK_LOG_GROUP`, `CHECK_HOSTED_ZONE_ID`; use your own resources. Unit tests use synthetic fixtures.
+
+To regenerate public documentation screenshots, install Playwright Chromium (`npx playwright install chromium`) and run `node scripts/documentation-screenshots.mjs`. It starts a loopback-only demo on port 4328 (override with `DOCS_PORT`), uses a fresh private data directory and temporary password, clears cloud identity settings and disables dotenv loading, drives real app interactions, then stops its server. Images are saved under `blog/images/`; review them before publishing. This does not start the AWS deployment or require cloud/model credentials.
 
 Before publishing, scan staged/tracked source **and complete Git history** with a secret scanner such as Gitleaks and `--redact`, plus manual review. Scans cannot prove absence of all secrets. Environments, data, DNS exports, cloud credentials, screenshots, presentation assets and builds are excluded. Revoke/rotate any real detected secret; merely deleting its latest copy is insufficient.
 

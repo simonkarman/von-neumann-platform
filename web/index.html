@@ -12,47 +12,54 @@
         ><span class="brand-mark">v<span>n</span></span
         ><span>von neumann<small>YOUR DATA, IN CONVERSATION</small></span></a
       >
-      <div class="workspace-label">
-        <span class="workspace-avatar">W</span>My workspace<span
-          style="margin-left: auto"
-          >⌄</span
-        >
-      </div>
-      <div class="nav-section">
-        <span class="eyebrow">WORKSPACE</span
-        ><a class="selected" href="/"><span>▦</span>All dashboards</a
-        ><button id="nav-new"><span>＋</span>New dashboard</button>
-      </div>
-      <div class="nav-section connections">
-        <span class="eyebrow">CONNECTED SOURCES <span>1</span></span>
-        <div class="connector">
-          <span class="aws-icon">☁</span>
-          <div>
-            Amazon Web Services<small id="connector-mode"
-              >Read-only connector</small
-            >
-          </div>
-          <span class="dot"></span>
-        </div>
+      <div class="sidebar-scroll">
+        <nav class="nav-section" aria-label="Workspace">
+          <span class="eyebrow">WORKSPACE</span
+          ><a class="selected" href="/"><span>▦</span>All dashboards</a
+          ><button id="nav-new"><span>＋</span>New dashboard</button>
+        </nav>
+        <nav class="nav-section recent-section" aria-label="Recent dashboards">
+          <span class="eyebrow">RECENT DASHBOARDS</span>
+          <div id="recent-dashboards" class="recent-links"></div>
+        </nav>
       </div>
       <div class="sidebar-bottom">
-        <div class="mode-note">
-          <span>◇</span>
-          <div id="mode-note">
-            A workspace that evolves<small
-              >Built around the questions you ask</small
-            >
-          </div>
+        <div class="connections">
+          <span class="eyebrow">CONNECTED SOURCES <span>1</span></span>
+          <button
+            type="button"
+            class="connector source-button"
+            id="source-details"
+            aria-label="About Amazon Web Services source"
+          >
+            <span class="aws-icon">☁</span>
+            <span class="source-copy">
+              Amazon Web Services<small id="connector-mode"
+                >Read-only connector</small
+              >
+            </span>
+            <span class="dot"></span>
+          </button>
+          <button class="add-source" id="add-source" type="button">
+            <span aria-hidden="true">＋</span> Add source
+          </button>
         </div>
-        <div class="user-card">
-          <span class="avatar">VN</span>
-          <div>My workspace<small>Workspace editor</small></div>
-          <button id="logout" class="icon-button" title="Sign out">↪</button>
-        </div>
+        <button id="logout" class="logout-button" type="button">
+          <span aria-hidden="true">↪</span> Log out
+        </button>
       </div>
     </aside>
     <main class="main">
       <header class="topbar">
+        <button
+          id="toggle-navigation"
+          class="mobile-navigation"
+          aria-label="Toggle navigation"
+          aria-expanded="false"
+          type="button"
+        >
+          ☰
+        </button>
         <span class="breadcrumbs"
           >Workspace <span>/</span> <strong>All dashboards</strong></span
         ><span class="topbar-note"
@@ -137,6 +144,38 @@
         </div>
       </div>
     </main>
+    <dialog id="source-dialog" aria-labelledby="source-dialog-title">
+      <span class="eyebrow">CONNECTED SOURCES</span>
+      <h2 id="source-dialog-title">Amazon Web Services</h2>
+      <p id="source-description"></p>
+      <p>
+        The connector exposes approved, read-only operations for resource
+        metadata, metrics and permitted logs. Access is enforced by the backend
+        and configured AWS permissions. DynamoDB record access is separately
+        restricted.
+      </p>
+      <p>
+        Credentials are managed on the server, never in your dashboard. Sharing
+        a widget can expose its bound data to the link holder.
+      </p>
+      <form method="dialog">
+        <button class="primary">Close source details</button>
+      </form>
+    </dialog>
+    <dialog id="add-source-dialog" aria-labelledby="add-source-title">
+      <span class="eyebrow">COMING LATER</span>
+      <h2 id="add-source-title">Add a source</h2>
+      <p>
+        Adding sources from the interface is not available yet. This version
+        supports one AWS connector, configured by the deployment operator on the
+        server.
+      </p>
+      <p>
+        Additional connector types need backend integration. Do not paste
+        credentials into the chat.
+      </p>
+      <form method="dialog"><button class="primary">Got it</button></form>
+    </dialog>
     <dialog id="login-dialog">
       <form id="login-form">
         <span class="eyebrow">WELCOME TO VON NEUMANN</span>

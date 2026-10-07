@@ -1,5 +1,103 @@
 import { test, expect } from "@playwright/test";
 
+test("sidebar recent navigation, source explanations, mobile access and logout", async ({
+  page,
+  browser,
+}) => {
+  await page.goto("/");
+  await page
+    .getByLabel("Workspace password", { exact: true })
+    .fill("test-only-workspace-password");
+  await page.getByRole("button", { name: "Open workspace" }).click();
+  await expect(page.locator(".workspace-label, .user-card")).toHaveCount(0);
+  const source = page.getByRole("button", {
+    name: "About Amazon Web Services source",
+  });
+  await source.click();
+  await expect(
+    page.getByRole("dialog", { name: "Amazon Web Services" }),
+  ).toContainText("synthetic sample data");
+  await page.keyboard.press("Escape");
+  await expect(source).toBeFocused();
+  await page.getByRole("button", { name: "Add source", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Add a source" }),
+  ).toContainText("not available yet");
+  await page.getByRole("button", { name: "Got it" }).click();
+  await page.locator("#create").click();
+  const input = page.getByRole("textbox", { name: "Ask your data" });
+  await expect(input).toBeEnabled({ timeout: 120000 });
+  await input.fill("Rename dashboard to Sidebar acceptance");
+  await page.getByRole("button", { name: "Send prompt" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Sidebar acceptance", exact: true }),
+  ).toBeVisible();
+  const recent = page.getByRole("navigation", { name: "Recent dashboards" });
+  await expect(
+    recent.getByRole("link", { name: "Sidebar acceptance", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await page
+    .getByRole("button", { name: "About Amazon Web Services source" })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Amazon Web Services" }),
+  ).toContainText("DynamoDB record access is separately restricted");
+  await page.getByRole("button", { name: "Close source details" }).click();
+  await page.getByRole("button", { name: "Add source", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Add a source" }),
+  ).toContainText("not available yet");
+  await page.keyboard.press("Escape");
+  const id = new URL(page.url()).pathname.split("/")[1];
+  const share = await (
+    await page.request.post(`/api/sessions/${id}/share`, { data: {} })
+  ).json();
+  const guest = await browser.newContext(),
+    viewer = await guest.newPage();
+  await viewer.goto(share.url);
+  await expect(
+    viewer.getByRole("navigation", { name: "Shared dashboard" }),
+  ).toBeVisible();
+  await expect(
+    viewer.getByRole("navigation", { name: "Recent dashboards" }),
+  ).toHaveCount(0);
+  await expect(
+    viewer.getByRole("button", { name: "Add source", exact: true }),
+  ).toHaveCount(0);
+  await guest.close();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Toggle navigation" }).click();
+  await expect(
+    page.getByRole("button", { name: "Log out", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await expect(
+    page.getByLabel("Workspace password", { exact: true }),
+  ).toBeVisible();
+  expect((await page.request.get("/api/sessions")).status()).toBe(401);
+  await page
+    .getByLabel("Workspace password", { exact: true })
+    .fill("test-only-workspace-password");
+  await page.getByRole("button", { name: "Open workspace" }).click();
+  await page.getByRole("button", { name: "Toggle navigation" }).click();
+  await page
+    .getByRole("navigation", { name: "Recent dashboards" })
+    .getByRole("link", { name: "Sidebar acceptance", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Sidebar acceptance", exact: true }),
+  ).toBeVisible({ timeout: 120000 });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page
+    .getByRole("navigation", { name: "Workspace" })
+    .getByRole("link", { name: "All dashboards", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await expect(
+    page.getByLabel("Workspace password", { exact: true }),
+  ).toBeVisible();
+});
+
 test("dashboard lifecycle: create, question, HMR edits, download, share, restore, restart", async ({
   page,
   browser,

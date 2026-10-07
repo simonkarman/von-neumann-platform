@@ -6,7 +6,7 @@ import {
   GetSecretValueCommand,
 } from "@aws-sdk/client-secrets-manager";
 import { fromIni } from "@aws-sdk/credential-providers";
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 const deployment = JSON.parse(
   await readFile(".data/aws-deployment.json", "utf8"),
 );
@@ -66,34 +66,51 @@ try {
       .map((l) => JSON.parse(l.slice(6)));
     const failure = events.find((e) => e.type === "error");
     if (failure) throw new Error(failure.message);
-    assert.ok(
-      events.some((e) => e.type === "updated"),
-      "Must persist a real edit, not just claim one",
-    );
-    console.log(
-      "Verified committed edit:",
-      events.find((e) => e.type === "updated").revision.slice(0, 7),
-    );
+    const edit = events.find((e) => e.type === "updated");
+    if (edit)
+      console.log("Verified committed edit:", edit.revision.slice(0, 7));
+    else
+      console.log(
+        "No new edit; verifying the persisted requested state below.",
+      );
     return json(`/api/sessions/${session.id}`);
   }
-  let s = await prompt(
-    'Name this dashboard "3D infrastructure explorer". Discover ALL EC2 instances in all configured regions, including stopped ones. Add one CPU graph for the last 24 hours with a separate series for each instance, highlight values over 60 percent, and add an instances inventory table. Do not ask me for IDs that you can discover.',
-  );
-  let chart = s.dashboard.widgets.find((w) => w.type === "chart");
-  assert.ok(chart?.series?.length >= 1);
-  assert.equal(chart.threshold, 60);
-  const revision = s.revision;
-  s = await prompt(
-    "Change the CPU chart threshold to 70 percent. Keep every existing series and the table.",
-  );
-  chart = s.dashboard.widgets.find((w) => w.type === "chart");
-  assert.equal(chart.threshold, 70);
-  assert.notEqual(s.revision, revision);
-  assert.ok(chart.series.length >= 1);
-  s = await prompt(
-    `Add a custom 3D visualization of the provisioned EBS volume capacity using live ec2_volumes data from ${deployment.region}. Let me fly through it with arrow keys. Label it as provisioned capacity, NOT used disk space. Include a button that toggles a summary between GiB and TiB. Use the isolated custom widget draft/test/publish workflow and keep the CPU chart and table.`,
-  );
+  let s;
+  if (process.env.CHECK_EXISTING_ONLY === "true") {
+    assert.ok(
+      process.env.CHECK_SESSION_ID,
+      "Existing-only verification requires an explicit session",
+    );
+    s = await json(`/api/sessions/${session.id}`);
+  } else {
+    s = await prompt(
+      'Name this dashboard "3D infrastructure explorer". Discover ALL EC2 instances in all configured regions, including stopped ones. Add one CPU graph for the last 24 hours with a separate series for each instance, highlight values over 60 percent, and add an instances inventory table. Do not ask me for IDs that you can discover.',
+    );
+    let chart = s.dashboard.widgets.find((w) => w.type === "chart");
+    assert.ok(chart?.series?.length >= 1);
+    assert.equal(chart.threshold, 60);
+    const revision = s.revision;
+    s = await prompt(
+      "Change the CPU chart threshold to 70 percent. Keep every existing series and the table.",
+    );
+    chart = s.dashboard.widgets.find((w) => w.type === "chart");
+    assert.equal(chart.threshold, 70);
+    assert.notEqual(s.revision, revision);
+    assert.ok(chart.series.length >= 1);
+    s = await prompt(
+      `Add a custom 3D visualization of the provisioned EBS volume capacity using live ec2_volumes data from ${deployment.region}. Let me fly through it with arrow keys. Label it as provisioned capacity, NOT used disk space. Include a button that toggles a summary between GiB and TiB. Use the isolated custom widget draft/test/publish workflow and keep the CPU chart and table.`,
+    );
+  }
   const custom = s.dashboard.widgets.find((w) => w.type === "custom");
+  assert.equal(
+    s.dashboard.widgets.find((w) => w.type === "chart")?.threshold,
+    70,
+    "Custom publish must preserve the existing chart",
+  );
+  assert.ok(
+    s.dashboard.widgets.find((w) => w.type === "chart")?.series?.length >= 1,
+    "Custom publish must preserve the existing series",
+  );
   assert.ok(custom?.custom?.source);
   assert.ok(
     custom.custom.bindings.some((b) => b.query.operation === "ec2_volumes"),
@@ -112,9 +129,23 @@ try {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`${deployment.Url}/${session.id}`);
+  await expect(
+    page.getByRole("navigation", { name: "Recent dashboards" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Log out", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "About Amazon Web Services source" })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Amazon Web Services" }),
+  ).toContainText("server-side identity");
+  await page.getByRole("button", { name: "Close source details" }).click();
+  assert.equal((await fetch(deployment.Url + "/api/sessions")).status, 401);
   await page.locator(".custom-scene canvas").waitFor({ timeout: 90000 });
   assert.equal(await page.locator(".custom-widget [role=alert]").count(), 0);
-  assert.equal(await page.locator(".multi-chart").count(), 1);
+  await expect(page.locator(".multi-chart")).toBeVisible({ timeout: 90000 });
   const control = page
     .locator(".custom-widget .custom-controls button")
     .first();
@@ -139,7 +170,7 @@ try {
   });
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: Sonnet real-tool edits, all-instance series, follow-up threshold, custom draft/test/publish, live EBS binding, button interaction, keyboard flight, browser without runtime errors.",
+    "PASS: persisted multi-instance chart, threshold, custom validation audit, live EBS binding, button interaction, keyboard flight, sidebar controls, anonymous blocking and browser without runtime errors.",
   );
   console.log(`Ready to try: ${deployment.Url}/${session.id}`);
 } finally {

@@ -31,8 +31,28 @@ async function create() {
 for (const id of ["#create", "#nav-new", "#welcome-new"])
   $(id).addEventListener("click", create);
 $("#logout").addEventListener("click", async () => {
-  await api("/api/auth/logout", {});
-  location.reload();
+  try {
+    await api("/api/auth/logout", {});
+    location.reload();
+  } catch (error) {
+    notice(error.message);
+  }
+});
+$("#source-details").addEventListener("click", () =>
+  $("#source-dialog").showModal(),
+);
+$("#add-source").addEventListener("click", () =>
+  $("#add-source-dialog").showModal(),
+);
+$("#toggle-navigation").addEventListener("click", () => {
+  const open = $(".sidebar").classList.toggle("open");
+  $("#toggle-navigation").setAttribute("aria-expanded", String(open));
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    $(".sidebar").classList.remove("open");
+    $("#toggle-navigation").setAttribute("aria-expanded", "false");
+  }
 });
 $("#import-button").addEventListener("click", () =>
   $("#import-dialog").showModal(),
@@ -79,6 +99,23 @@ async function load() {
     api("/api/sessions"),
     api("/api/config"),
   ]);
+  const recent = $("#recent-dashboards");
+  recent.replaceChildren();
+  for (const session of sessions.slice(0, 6)) {
+    const link = element("a", "recent-link", session.title);
+    link.href = `/${session.id}`;
+    link.title = session.title;
+    link.setAttribute("aria-label", session.title);
+    recent.append(link);
+  }
+  if (!sessions.length)
+    recent.append(
+      element("p", "recent-empty", "Your recent dashboards will appear here."),
+    );
+  $("#source-description").textContent =
+    config.mode === "demo"
+      ? "Demo mode uses synthetic sample data. No live AWS account is queried."
+      : "This workspace is connected to AWS through its server-side identity. Available resources depend on its configured scope.";
   $("#count").textContent = sessions.length;
   $("#connector-mode").textContent =
     config.mode === "demo"
